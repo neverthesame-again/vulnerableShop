@@ -41,8 +41,19 @@ def _is_allowed_destination(url: str) -> bool:
     if parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
         return False
     host = parts.hostname.lower()
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_multicast:
+            return False
+    except ValueError:
+        pass
     allowed = get_settings().allowed_fetch_hosts
     return host in allowed or f"{host}:{port}" in allowed
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def http_error_30x(self, req, fp, code, msg, headers):
+        raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
 
 
 @router.post("/fetch-url", response_model=FetchResponse)
@@ -51,7 +62,8 @@ def fetch_url(request: FetchRequest):
     if not _is_allowed_destination(request.url):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed destination")
     try:
-        with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
+        opener = urllib.request.build_opener(_NoRedirectHandler)
+        with opener.open(request.url, timeout=settings.fetch_timeout_seconds) as response:
             status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
             content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
     except Exception:
@@ -70,6 +82,8 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     count_flag = "-n" if platform.system() == "Windows" else "-c"
     cmd = ["ping", count_flag, "1", host]
     try:
