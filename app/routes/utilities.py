@@ -52,8 +52,8 @@ def _is_allowed_destination(url: str) -> bool:
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def http_error_30x(self, req, fp, code, msg, headers):
-        raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 @router.post("/fetch-url", response_model=FetchResponse)
