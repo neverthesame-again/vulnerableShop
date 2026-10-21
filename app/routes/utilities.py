@@ -48,10 +48,17 @@ def _is_allowed_destination(url: str) -> bool:
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
     settings = get_settings()
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
     try:
-        with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
-            status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
-            content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
+        with httpx.Client(follow_redirects=False, timeout=settings.fetch_timeout_seconds) as httpx_client:
+            response = httpx_client.get(request.url)
+            if response.is_redirect:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirects not allowed")
+            status_code = response.status_code
+            content = response.text[:settings.max_fetch_bytes]
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Upstream request failed")
 
@@ -68,12 +75,14 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     count_flag = "-n" if platform.system() == "Windows" else "-c"
-    cmd = f"ping {count_flag} 1 {host}"
+    cmd = ["ping", count_flag, "1", host]
     try:
         result = subprocess.run(
             cmd,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=10,

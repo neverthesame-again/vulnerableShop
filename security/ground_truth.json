@@ -23,7 +23,7 @@
   },
   {
     "id": "VULN-002",
-    "status": "introduced",
+    "status": "resolved",
     "category": "command-injection",
     "cwe": "CWE-78",
     "file": "app/routes/utilities.py",
@@ -44,7 +44,7 @@
   },
   {
     "id": "VULN-003",
-    "status": "introduced",
+    "status": "resolved",
     "category": "ssrf",
     "cwe": "CWE-918",
     "file": "app/routes/utilities.py",
@@ -67,7 +67,7 @@
   },
   {
     "id": "VULN-004",
-    "status": "introduced",
+    "status": "resolved",
     "category": "hardcoded-secret",
     "cwe": "CWE-798",
     "file": "app/config.py",
