@@ -55,7 +55,7 @@ def _is_allowed_destination(url: str) -> bool:
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
     if not _is_allowed_destination(request.url):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Destination not allowed")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
     settings = get_settings()
     try:
         class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -66,7 +66,7 @@ def fetch_url(request: FetchRequest):
             status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
             final_url = response.geturl()
             if not _is_allowed_destination(final_url):
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Destination not allowed")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
             content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
     except HTTPException:
         raise
