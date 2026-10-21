@@ -49,7 +49,7 @@ def _is_allowed_destination(url: str) -> bool:
         if host in ("localhost", "127.0.0.1", "::1"):
             return False
     allowed = get_settings().allowed_fetch_hosts
-    return host in allowed or f"{host}:{port}" in allowed
+    return host in allowed or f"{host}:{port}" in allowed or (port in DEFAULT_PORTS.values() and host in allowed)
 
 
 @router.post("/fetch-url", response_model=FetchResponse)
