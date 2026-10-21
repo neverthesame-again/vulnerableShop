@@ -41,17 +41,35 @@ def _is_allowed_destination(url: str) -> bool:
     if parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
         return False
     host = parts.hostname.lower()
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+            return False
+    except ValueError:
+        if host in ("localhost", "127.0.0.1", "::1"):
+            return False
     allowed = get_settings().allowed_fetch_hosts
-    return host in allowed or f"{host}:{port}" in allowed
+    return host in allowed or f"{host}:{port}" in allowed or (port in DEFAULT_PORTS.values() and host in allowed)
 
 
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
     settings = get_settings()
     try:
-        with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
+        class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        opener = urllib.request.build_opener(NoRedirectHandler)
+        with opener.open(request.url, timeout=settings.fetch_timeout_seconds) as response:
             status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
+            final_url = response.geturl()
+            if not _is_allowed_destination(final_url):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
             content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Upstream request failed")
 
@@ -68,12 +86,14 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    if not _is_valid_host(host) or host.startswith("-"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     count_flag = "-n" if platform.system() == "Windows" else "-c"
-    cmd = f"ping {count_flag} 1 {host}"
+    cmd = ["ping", count_flag, "1", host]
     try:
         result = subprocess.run(
             cmd,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=10,
