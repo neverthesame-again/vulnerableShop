@@ -47,6 +47,8 @@ def _is_allowed_destination(url: str) -> bool:
 
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
     settings = get_settings()
     try:
         with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
