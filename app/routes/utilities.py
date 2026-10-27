@@ -38,7 +38,7 @@ def _is_allowed_destination(url: str) -> bool:
         port = parts.port or DEFAULT_PORTS.get(parts.scheme)
     except ValueError:
         return False
-    if parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
+    if parts.scheme not in ("http", "https") or parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
         return False
     host = parts.hostname.lower()
     allowed = get_settings().allowed_fetch_hosts
