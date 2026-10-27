@@ -51,7 +51,7 @@ def fetch_url(request: FetchRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination not allowed")
     settings = get_settings()
     try:
-        with httpx.Client(timeout=settings.fetch_timeout_seconds, follow_redirects=True) as client:
+        with httpx.Client(timeout=settings.fetch_timeout_seconds, follow_redirects=False) as client:
             response = client.get(request.url)
             status_code = response.status_code
             content = response.text[:settings.max_fetch_bytes]
@@ -71,6 +71,8 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     count_flag = "-n" if platform.system() == "Windows" else "-c"
     cmd = ["ping", count_flag, "1", host]
     try:
