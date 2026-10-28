@@ -4,7 +4,7 @@ import ipaddress
 import platform
 import re
 import subprocess
-import urllib.request
+
 from urllib.parse import urlsplit
 
 import httpx
