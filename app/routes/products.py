@@ -32,13 +32,14 @@ def list_products():
 
 @router.get("/search", response_model=list[Product])
 def search_products(q: str = Query(min_length=1, max_length=100)):
+    like_q = f"%{_escape_like(q)}%"
     query = (
-        f"SELECT id, name, description, price, stock FROM products "
-        f"WHERE name LIKE '%{q}%' OR description LIKE '%{q}%' "
-        f"ORDER BY id"
+        "SELECT id, name, description, price, stock FROM products "
+        "WHERE name LIKE ? OR description LIKE ? "
+        "ORDER BY id"
     )
     with get_connection() as conn:
-        rows = conn.execute(query).fetchall()
+        rows = conn.execute(query, (like_q, like_q)).fetchall()
     return [dict(row) for row in rows]
 
 

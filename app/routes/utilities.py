@@ -38,7 +38,7 @@ def _is_allowed_destination(url: str) -> bool:
         port = parts.port or DEFAULT_PORTS.get(parts.scheme)
     except ValueError:
         return False
-    if parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
+    if parts.scheme not in ("http", "https") or parts.scheme not in DEFAULT_PORTS or not parts.hostname or parts.username or parts.password:
         return False
     host = parts.hostname.lower()
     allowed = get_settings().allowed_fetch_hosts
@@ -48,10 +48,13 @@ def _is_allowed_destination(url: str) -> bool:
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
     settings = get_settings()
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed destination")
     try:
-        with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
-            status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
-            content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
+        with httpx.Client(follow_redirects=False) as client:
+            resp = client.get(request.url, timeout=settings.fetch_timeout_seconds)
+            status_code = resp.status_code
+            content = resp.text[:settings.max_fetch_bytes]
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Upstream request failed")
 
@@ -68,12 +71,13 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     count_flag = "-n" if platform.system() == "Windows" else "-c"
-    cmd = f"ping {count_flag} 1 {host}"
+    cmd = ["ping", count_flag, "1", host]
     try:
         result = subprocess.run(
             cmd,
-            shell=True,
             capture_output=True,
             text=True,
             timeout=10,
