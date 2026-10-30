@@ -69,11 +69,11 @@ def _is_valid_host(host: str) -> bool:
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
     count_flag = "-n" if platform.system() == "Windows" else "-c"
-    cmd = f"ping {count_flag} 1 {host}"
+    args = ["ping", count_flag, "1", host]
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
+            args,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=10,
