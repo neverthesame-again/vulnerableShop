@@ -52,6 +52,8 @@ def fetch_url(request: FetchRequest):
     if not _is_allowed_destination(request.url):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed fetch destination")
     try:
+        if not _is_allowed_destination(request.url):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="URL not allowed")
         with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
             status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
             content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
