@@ -48,10 +48,19 @@ def _is_allowed_destination(url: str) -> bool:
 @router.post("/fetch-url", response_model=FetchResponse)
 def fetch_url(request: FetchRequest):
     settings = get_settings()
+    # Validate destination before making any outbound request
+    parts = urlsplit(request.url)
+    # Reject unsupported schemes, credentials in URL or malformed URLs
+    if parts.scheme not in DEFAULT_PORTS or parts.username or parts.password or not parts.hostname:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed destination")
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed destination")
+
     try:
-        with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
-            status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
-            content = response.read(settings.max_fetch_bytes).decode("utf-8", errors="replace")
+        # Use httpx and do not follow redirects to avoid server-side request forgery via redirects
+        resp = httpx.get(request.url, follow_redirects=False, timeout=settings.fetch_timeout_seconds)
+        status_code = resp.status_code
+        content = resp.text[: settings.max_fetch_bytes]
     except Exception:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Upstream request failed")
 
@@ -68,6 +77,10 @@ def _is_valid_host(host: str) -> bool:
 
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
+    # Validate host strictly to reject shell metacharacters and option injections
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
+
     count_flag = "-n" if platform.system() == "Windows" else "-c"
     args = ["ping", count_flag, "1", host]
     try:
