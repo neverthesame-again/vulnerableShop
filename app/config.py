@@ -20,7 +20,7 @@ def _parse_hosts(raw: str) -> frozenset[str]:
 def get_settings() -> Settings:
     return Settings(
         db_path=os.getenv("VULNSHOP_DB_PATH", "vulnerable_shop.db"),
-        demo_api_key=os.getenv("VULNSHOP_DEMO_API_KEY", "vulnshop-test-secret-key-4a8b1c9d2e"),
+        demo_api_key=os.getenv("VULNSHOP_DEMO_API_KEY"),
         # Comma-separated "host" or "host:port" entries that /fetch-url may contact.
         allowed_fetch_hosts=_parse_hosts(os.getenv("VULNSHOP_ALLOWED_FETCH_HOSTS", "example.test")),
         fetch_timeout_seconds=float(os.getenv("VULNSHOP_FETCH_TIMEOUT", "5")),
