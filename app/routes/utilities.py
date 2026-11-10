@@ -73,6 +73,9 @@ def _is_valid_host(host: str) -> bool:
 @router.get("/diagnostics/ping")
 def ping_host(host: str = Query(min_length=1, max_length=253)):
     count_flag = "-n" if platform.system() == "Windows" else "-c"
+    # Validate the host to ensure it's a safe hostname or IP address
+    if not _is_valid_host(host):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid host")
     # Use an argument list to avoid invoking a shell and prevent command injection
     cmd = ["ping", count_flag, "1", host]
     try:
