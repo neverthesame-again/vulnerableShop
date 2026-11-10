@@ -51,6 +51,10 @@ def fetch_url(request: FetchRequest):
     # Validate destination against configured allowlist to prevent SSRF
     if not _is_allowed_destination(request.url):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Destination not allowed")
+    # Ensure the destination is allowed (scheme, host, optional port and no creds)
+    if not _is_allowed_destination(request.url):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Requested URL is not allowed")
+
     try:
         with urllib.request.urlopen(request.url, timeout=settings.fetch_timeout_seconds) as response:
             status_code = getattr(response, "status", None) or getattr(response, "code", None) or 200
